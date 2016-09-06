@@ -17,15 +17,36 @@ using namespace std;
 void PackerBase::StreamBuffer::Resize(size_t newSize)
 {
     m_size = newSize;
-    m_data.reset(reinterpret_cast<char*>(m_memoryProvider->Alloc(1, newSize)),
-        [this](char* p)
+    auto provider = m_memoryProvider;
+    m_data.reset(reinterpret_cast<char*>(provider->Alloc(1, newSize)),
+        [provider](char* p)
     {
-        m_memoryProvider->Free(p);
+        provider->Free(p);
     });
 }
 
-void PackerBase::StartEpoch(const EpochConfiguration& config)
+void PackerBase::StartEpoch(const EpochConfiguration& config, const std::vector<MemoryProviderPtr>& memoryProviders)
 {
+    bool equal = m_memoryProviders.size() == memoryProviders.size() &&
+        std::equal(memoryProviders.begin(), memoryProviders.end(), m_memoryProviders.begin());
+
+    if (!equal)
+    {
+        // Have to invalidate buffers:
+        m_memoryProviders = memoryProviders;
+
+        if (memoryProviders.size() != m_outputStreamDescriptions.size())
+        {
+            RuntimeError("Number of streams does not match the number of memory providers.");
+        }
+
+        m_streamBuffers.reserve(m_outputStreamDescriptions.size());
+        for (size_t i = 0; i < m_outputStreamDescriptions.size(); ++i)
+        {
+            m_streamBuffers.push_back(StreamBuffer(memoryProviders[i]));
+        }
+    }
+
     m_minibatchSize = config.m_minibatchSizeInSamples;
     if (m_minibatchSize == 0)
     {
@@ -33,8 +54,7 @@ void PackerBase::StartEpoch(const EpochConfiguration& config)
     }
 }
 
-PackerBase::PackerBase(MemoryProviderPtr memoryProvider,
-    SequenceEnumeratorPtr sequenceEnumerator,
+PackerBase::PackerBase(SequenceEnumeratorPtr sequenceEnumerator,
     const std::vector<StreamDescriptionPtr>& streams) :
     m_sequenceEnumerator(sequenceEnumerator),
     m_minibatchSize(0),
@@ -44,7 +64,6 @@ PackerBase::PackerBase(MemoryProviderPtr memoryProvider,
     assert(m_inputStreamDescriptions.size() != 0);
     assert(m_inputStreamDescriptions.size() == m_outputStreamDescriptions.size());
 
-    m_streamBuffers.reserve(m_outputStreamDescriptions.size());
     m_checkSampleShape.resize(m_outputStreamDescriptions.size(), false);
 
     // Sanity checks:
@@ -75,8 +94,6 @@ PackerBase::PackerBase(MemoryProviderPtr memoryProvider,
             RuntimeError("Dense to sparse re-packing requested for stream '%ls' is not supported.",
                 stream->m_name.c_str());
         }
-
-        m_streamBuffers.push_back(StreamBuffer(memoryProvider));
     }
 }
 
