@@ -16,8 +16,6 @@
 #include "TruncatedBpttPacker.h"
 #include "BlockRandomizer.h"
 #include "NoRandomizer.h"
-#include <CudaMemoryProvider.h>
-#include <HeapMemoryProvider.h>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

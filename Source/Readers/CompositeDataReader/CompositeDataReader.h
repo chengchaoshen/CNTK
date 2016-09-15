@@ -98,12 +98,6 @@ private:
 
     // Truncation length for BPTT mode.
     size_t m_truncationLength;
-
-    // Required inputs for the epoch.
-    std::map<std::wstring, int> m_requiredInputs;
-
-    // Memory provider per input.
-    std::vector<MemoryProviderPtr> m_memoryProviders;
 };
 
 }}}

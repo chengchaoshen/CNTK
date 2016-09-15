@@ -6,9 +6,7 @@
 #pragma once
 
 #include "ReaderBase.h"
-#include "Packer.h"
 #include "Config.h"
-#include "SequenceEnumerator.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -48,12 +46,6 @@ private:
 
     // Parallel sequences, used for legacy configs.
     intargvector m_numParallelSequencesForAllEpochs;
-
-    // Required inputs for the epoch.
-    std::map<std::wstring, int> m_requiredInputs;
-
-    // Memory provider per input.
-    std::vector<MemoryProviderPtr> m_memoryProviders;
 };
 
 }}}
