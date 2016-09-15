@@ -114,11 +114,11 @@ HTKMLFReader::HTKMLFReader(const ConfigParameters& readerConfig)
     // TODO: this should be bool. Change when config per deserializer is allowed.
     if (AreEqualIgnoreCase(readMethod, std::wstring(L"blockRandomize")))
     {
-        m_randomizer = std::make_shared<BlockRandomizer>(verbosity, window, bundler, true  /* should Prefetch */, BlockRandomizer::DecimationMode::chunk, true /* useLegacyRandomization */);
+        m_sequenceEnumerator = std::make_shared<BlockRandomizer>(verbosity, window, bundler, true  /* should Prefetch */, BlockRandomizer::DecimationMode::chunk, true /* useLegacyRandomization */);
     }
     else if (AreEqualIgnoreCase(readMethod, std::wstring(L"none")))
     {
-        m_randomizer = std::make_shared<NoRandomizer>(bundler);
+        m_sequenceEnumerator = std::make_shared<NoRandomizer>(bundler);
     }
     else
     {
@@ -153,13 +153,13 @@ HTKMLFReader::HTKMLFReader(const ConfigParameters& readerConfig)
     switch (m_packingMode)
     {
     case PackingMode::sample:
-        m_packer = std::make_shared<FramePacker>(m_randomizer, m_streams);
+        m_packer = std::make_shared<FramePacker>(m_sequenceEnumerator, m_streams);
         break;
     case PackingMode::sequence:
-        m_packer = std::make_shared<SequencePacker>(m_randomizer, m_streams);
+        m_packer = std::make_shared<SequencePacker>(m_sequenceEnumerator, m_streams);
         break;
     case PackingMode::truncated:
-        m_packer = std::make_shared<TruncatedBPTTPacker>(m_randomizer, m_streams);
+        m_packer = std::make_shared<TruncatedBPTTPacker>(m_sequenceEnumerator, m_streams);
         break;
     default:
         LogicError("Unsupported type of packer '%d'.", (int)m_packingMode);
@@ -174,28 +174,7 @@ std::vector<StreamDescriptionPtr> HTKMLFReader::GetStreamDescriptions()
 
 void HTKMLFReader::StartEpoch(const EpochConfiguration& config, const std::map<std::wstring, int>& requiredStreams)
 {
-    if (config.m_totalEpochSizeInSamples == 0)
-    {
-        RuntimeError("Epoch size cannot be 0.");
-    }
-
-    if (requiredStreams.size() != m_requiredInputs.size()
-        || !std::equal(requiredStreams.begin(), requiredStreams.end(), m_requiredInputs.begin()))
-    {
-        m_requiredInputs = requiredStreams;
-
-        // Reallocating memory providers.
-        m_memoryProviders.resize(m_streams.size());
-        for (size_t i = 0; i < m_streams.size(); ++i)
-        {
-            int deviceId = m_requiredInputs[m_streams[i]->m_name];
-            if (deviceId < 0)
-                m_memoryProviders[i] = std::make_shared<HeapMemoryProvider>();
-            else
-                m_memoryProviders[i] = std::make_shared<CudaMemoryProvider>(deviceId);
-        }
-    }
-
+    EpochConfiguration cfg = config;
     if (m_packingMode == PackingMode::truncated)
     {
         size_t minibatchSize = config.m_minibatchSizeInSamples;
@@ -211,28 +190,11 @@ void HTKMLFReader::StartEpoch(const EpochConfiguration& config, const std::map<s
             minibatchSize = numParallelSequences * truncationLength;
         }
 
-        EpochConfiguration bpttConfig;
-        bpttConfig.m_numberOfWorkers = config.m_numberOfWorkers;
-        bpttConfig.m_workerRank = config.m_workerRank;
-        bpttConfig.m_totalEpochSizeInSamples = config.m_totalEpochSizeInSamples;
-        bpttConfig.m_epochIndex = config.m_epochIndex;
-        bpttConfig.m_minibatchSizeInSamples = minibatchSize;
-        bpttConfig.m_truncationSize = truncationLength;
-
-        m_randomizer->StartEpoch(bpttConfig);
-        m_packer->StartEpoch(bpttConfig, m_memoryProviders);
+        cfg.m_minibatchSizeInSamples = minibatchSize;
+        cfg.m_truncationSize = truncationLength;
     }
-    else
-    {
-        m_randomizer->StartEpoch(config);
-        m_packer->StartEpoch(config, m_memoryProviders);
-    }
-}
 
-Minibatch HTKMLFReader::ReadMinibatch()
-{
-    assert(m_packer != nullptr);
-    return m_packer->ReadMinibatch();
+    ReaderBase::StartEpoch(cfg, requiredStreams);
 }
 
 }}}

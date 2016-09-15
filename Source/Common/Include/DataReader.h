@@ -37,14 +37,20 @@ namespace msra { namespace dbn {  class latticepair; class latticesource; } }
 namespace msra { namespace asr {  class simplesenonehmm; } } 
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-    // this class contains input stream descriptions, the network can request less streams than the reader provides.
+
+    // This class contains input stream descriptions, 
+    // the network can request less streams than the reader provides.
+    // TODO: Should be unified with StreamDescription from the new reader API
     struct InputStreamDescription
     {
+        // Stream name.
         std::wstring m_name;
+
+        // Device identifier for the resulting matrix of this stream.
         int m_deviceId;
     };
 
-    inline bool operator ==(const InputStreamDescription& a, const InputStreamDescription& b)
+    inline bool operator == (const InputStreamDescription& a, const InputStreamDescription& b)
     {
         return a.m_name == b.m_name && a.m_deviceId == b.m_deviceId;
     };
@@ -151,6 +157,7 @@ public:
     // only used by test code:
     void insert(std::pair<wstring, Input> pair) { inputs.insert(pair); }
 
+    // Returns description of required streams for the minibatch.
     std::unordered_set<InputStreamDescription> GetStreamDescriptions() const
     {
         std::unordered_set<InputStreamDescription> streamDescriptions;
@@ -180,12 +187,12 @@ public:
 protected:
     virtual ~IDataReader() { }
 public:
-    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, const std::unordered_set<InputStreamDescription>&, size_t requestedEpochSamples = requestDataSize)
+    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, const std::unordered_set<InputStreamDescription>& /*requiredStreams*/, size_t requestedEpochSamples = requestDataSize)
     {
         StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
     }
 
-    virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, const std::unordered_set<InputStreamDescription>&, size_t requestedEpochSamples = requestDataSize)
+    virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, const std::unordered_set<InputStreamDescription>& /*requiredStreams*/, size_t requestedEpochSamples = requestDataSize)
     {
         StartDistributedMinibatchLoop(mbSize, epoch, subsetNum, numSubsets, requestedEpochSamples);
     }

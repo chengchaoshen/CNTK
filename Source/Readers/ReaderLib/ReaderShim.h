@@ -54,12 +54,12 @@ public:
 
     virtual void StartMinibatchLoop(size_t, size_t, size_t) override
     {
-        LogicError("Not implemented");
+        LogicError("Legacy StartMinibatchLoop is not implemented.");
     }
 
     virtual void StartDistributedMinibatchLoop(size_t, size_t, size_t, size_t, size_t) override
     {
-        LogicError("Not implemented");
+        LogicError("Legacy StartDistributedMinibatchLoop is not implemented.");
     }
 
     virtual bool SupportsDistributedMBRead() const override

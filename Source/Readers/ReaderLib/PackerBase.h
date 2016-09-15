@@ -72,7 +72,7 @@ protected:
     // For which streams there should be a shape check for each sequence.
     std::vector<bool> m_checkSampleShape;
 
-    // A memory provider per stream.
+    // Memory providers. Each stream has its own memory provider.
     std::vector<MemoryProviderPtr> m_memoryProviders;
 
 public:

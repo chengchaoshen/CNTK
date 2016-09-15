@@ -127,11 +127,12 @@ namespace CNTK
             {
                 // TODO: Add support for distributed reading
                 EpochConfiguration epochConfig = { 1, 0, minibatchSizeInSamples, m_epochSize, 0, 0 };
+
                 std::map<std::wstring, int> requiredStreams;
-                for(const auto& s : m_streamInfos)
-                {
-                    requiredStreams[s.m_name] = -1; // Allocating all on CPU for now.
-                }
+                for (const auto& s : m_streamInfos)
+                    // Allocating all on CPU for now.
+                    requiredStreams[s.m_name] = -1;
+
                 m_compositeDataReader->StartEpoch(epochConfig, requiredStreams);
                 m_prevMinibatchSize = minibatchSizeInSamples;
             }

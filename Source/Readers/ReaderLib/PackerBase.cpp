@@ -13,7 +13,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 using namespace std;
 
-// TODO: this should be handled by the memory provider
+// Resizing the buffer with the current memory provider.
 void PackerBase::StreamBuffer::Resize(size_t newSize)
 {
     m_size = newSize;
@@ -27,24 +27,21 @@ void PackerBase::StreamBuffer::Resize(size_t newSize)
 
 void PackerBase::StartEpoch(const EpochConfiguration& config, const std::vector<MemoryProviderPtr>& memoryProviders)
 {
+    // Let's check that memory providers did not change at the start of new epoch.
     bool equal = m_memoryProviders.size() == memoryProviders.size() &&
         std::equal(memoryProviders.begin(), memoryProviders.end(), m_memoryProviders.begin());
 
     if (!equal)
     {
-        // Have to invalidate buffers:
+        // If they change we have to reinitialize the buffers with the new memory providers, one per stream.
         m_memoryProviders = memoryProviders;
 
         if (memoryProviders.size() != m_outputStreamDescriptions.size())
-        {
             RuntimeError("Number of streams does not match the number of memory providers.");
-        }
 
         m_streamBuffers.reserve(m_outputStreamDescriptions.size());
         for (size_t i = 0; i < m_outputStreamDescriptions.size(); ++i)
-        {
             m_streamBuffers.push_back(StreamBuffer(memoryProviders[i]));
-        }
     }
 
     m_minibatchSize = config.m_minibatchSizeInSamples;

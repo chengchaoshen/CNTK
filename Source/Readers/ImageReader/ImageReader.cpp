@@ -14,8 +14,6 @@
 #include "FramePacker.h"
 #include <omp.h>
 #include "TransformController.h"
-#include "HeapMemoryProvider.h"
-#include "CudaMemoryProvider.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -87,37 +85,4 @@ std::vector<StreamDescriptionPtr> ImageReader::GetStreamDescriptions()
     return m_streams;
 }
 
-void ImageReader::StartEpoch(const EpochConfiguration& config, const std::map<std::wstring, int>& inputDescriptions)
-{
-    if (config.m_totalEpochSizeInSamples == 0)
-    {
-        RuntimeError("Epoch size cannot be 0.");
-    }
-
-    if (inputDescriptions.size() != m_requiredInputs.size()
-        || !std::equal(inputDescriptions.begin(), inputDescriptions.end(), m_requiredInputs.begin()))
-    {
-        m_requiredInputs = inputDescriptions;
-
-        // Reallocating memory providers.
-        m_memoryProviders.resize(m_streams.size());
-        for (size_t i = 0; i < m_streams.size(); ++i)
-        {
-            int deviceId = m_requiredInputs[m_streams[i]->m_name];
-            if (deviceId < 0)
-                m_memoryProviders[i] = std::make_shared<HeapMemoryProvider>();
-            else
-                m_memoryProviders[i] = std::make_shared<CudaMemoryProvider>(deviceId);
-        }
-    }
-
-    m_sequenceEnumerator->StartEpoch(config);
-    m_packer->StartEpoch(config, m_memoryProviders);
-}
-
-Minibatch ImageReader::ReadMinibatch()
-{
-    assert(m_packer != nullptr);
-    return m_packer->ReadMinibatch();
-}
 } } }

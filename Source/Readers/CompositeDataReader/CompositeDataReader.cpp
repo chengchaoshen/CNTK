@@ -30,7 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // directly to the new Reader API. 
 // For more information please see its header file.
 // This method composes together packers + randomizer + a set of transformers and deserializers.
-CompositeDataReader::CompositeDataReader(const ConfigParameters& config, MemoryProviderPtr provider) : m_layout(make_shared<MBLayout>()),
+CompositeDataReader::CompositeDataReader(const ConfigParameters& config) :
     m_corpus(std::make_shared<CorpusDescriptor>())
 {
     wstring action = config(L"action", L"");
@@ -110,7 +110,7 @@ CompositeDataReader::CompositeDataReader(const ConfigParameters& config, MemoryP
 
     // In case when there are transforms, applying them to the data.
     m_sequenceEnumerator = m_transforms.empty()
-        ? m_sequenceEnumerator 
+        ? m_sequenceEnumerator
         : std::make_shared<TransformController>(m_transforms, m_sequenceEnumerator);
 
     // TODO: Creating output stream descriptions - this should come from the network so that we can check 
@@ -125,7 +125,6 @@ CompositeDataReader::CompositeDataReader(const ConfigParameters& config, MemoryP
             stream->m_storageType = StorageType::dense;
         }
         m_streams.push_back(stream);
-        m_nameToStreamId.insert(std::make_pair(streamDescription->m_name, streamDescription->m_id));
     }
 
     switch (m_packingMode)
@@ -155,11 +154,6 @@ CompositeDataReader::CompositeDataReader(const ConfigParameters& config, MemoryP
 std::vector<StreamDescriptionPtr> CompositeDataReader::GetStreamDescriptions()
 {
     return m_streams;
-}
-
-Minibatch CompositeDataReader::ReadMinibatch()
-{
-    return m_packer->ReadMinibatch();
 }
 
 // Create deserializers based on the specified configuration. 
@@ -281,30 +275,7 @@ void CompositeDataReader::StartEpoch(const EpochConfiguration& cfg, const std::m
         config.m_truncationSize = m_truncationLength;
     }
 
-    if (config.m_totalEpochSizeInSamples <= 0)
-    {
-        RuntimeError("Unsupported epoch size '%d'.", (int)config.m_totalEpochSizeInSamples);
-    }
-
-    if (inputDescriptions.size() != m_requiredInputs.size()
-        || !std::equal(inputDescriptions.begin(), inputDescriptions.end(), m_requiredInputs.begin()))
-    {
-        m_requiredInputs = inputDescriptions;
-
-        // Reallocating memory providers.
-        m_memoryProviders.resize(m_streams.size());
-        for (size_t i = 0; i < m_streams.size(); ++i)
-        {
-            int deviceId = m_requiredInputs[m_streams[i]->m_name];
-            if (deviceId < 0)
-                m_memoryProviders[i] = std::make_shared<HeapMemoryProvider>();
-            else
-                m_memoryProviders[i] = std::make_shared<CudaMemoryProvider>(deviceId);
-        }
-    }
-
-    m_sequenceEnumerator->StartEpoch(config);
-    m_packer->StartEpoch(config, m_memoryProviders);
+    ReaderBase::StartEpoch(config, inputDescriptions);
 }
 
 }}}

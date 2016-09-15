@@ -77,9 +77,7 @@ void ReaderShim<ElemType>::StartDistributedMinibatchLoop(
 
     std::map<std::wstring, int> inputDescriptions;
     for (const auto& i : inputs)
-    {
         inputDescriptions[i.m_name] = i.m_deviceId;
-    }
 
     m_reader->StartEpoch(config, inputDescriptions);
     m_endOfEpoch = false;

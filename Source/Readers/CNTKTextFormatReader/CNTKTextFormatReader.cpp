@@ -13,10 +13,10 @@
 #include "TextParser.h"
 #include "SequencePacker.h"
 #include "FramePacker.h"
-#include <CudaMemoryProvider.h>
-#include <HeapMemoryProvider.h>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
+
+using namespace std;
 
 // TODO: This class should go away eventually.
 // TODO: The composition of packer + randomizer + different deserializers in a generic manner is done in the CompositeDataReader.
@@ -28,42 +28,36 @@ CNTKTextFormatReader::CNTKTextFormatReader(const ConfigParameters& config)
     try
     {
         if (configHelper.GetElementType() == ElementType::tfloat)
-        {
-            m_deserializer = shared_ptr<IDataDeserializer>(new TextParser<float>(configHelper));
-        }
+            m_deserializer = make_shared<TextParser<float>>(configHelper);
         else
-        {
-            m_deserializer = shared_ptr<IDataDeserializer>(new TextParser<double>(configHelper));
-        }
+            m_deserializer = make_shared<TextParser<double>>(configHelper);
 
-        if (configHelper.ShouldKeepDataInMemory()) 
-        {
-            m_deserializer = shared_ptr<IDataDeserializer>(new ChunkCache(m_deserializer));
-        }
+        if (configHelper.ShouldKeepDataInMemory())
+            m_deserializer = make_shared<ChunkCache>(m_deserializer);
 
         size_t window = configHelper.GetRandomizationWindow();
         if (window > 0)
         {
             // Verbosity is a general config parameter, not specific to the text format reader.
             int verbosity = config(L"verbosity", 0);
-            m_randomizer = make_shared<BlockRandomizer>(verbosity, window, m_deserializer, true);
+            m_sequenceEnumerator = make_shared<BlockRandomizer>(verbosity, window, m_deserializer, true);
         }
         else
         {
-            m_randomizer = std::make_shared<NoRandomizer>(m_deserializer);
+            m_sequenceEnumerator = make_shared<NoRandomizer>(m_deserializer);
         }
 
         if (configHelper.IsInFrameMode()) 
         {
             m_packer = std::make_shared<FramePacker>(
-                m_randomizer,
-                GetStreamDescriptions());
+                m_sequenceEnumerator,
+                ReaderBase::GetStreamDescriptions());
         }
         else
         {
             m_packer = std::make_shared<SequencePacker>(
-                m_randomizer,
-            GetStreamDescriptions());
+                m_sequenceEnumerator,
+                ReaderBase::GetStreamDescriptions());
         }
     }
     catch (const std::runtime_error& e)
@@ -72,43 +66,4 @@ CNTKTextFormatReader::CNTKTextFormatReader(const ConfigParameters& config)
     }
 }
 
-std::vector<StreamDescriptionPtr> CNTKTextFormatReader::GetStreamDescriptions()
-{
-    return m_deserializer->GetStreamDescriptions();
-}
-
-void CNTKTextFormatReader::StartEpoch(const EpochConfiguration& config, const std::map<std::wstring, int>& inputDescriptions)
-{
-    if (config.m_totalEpochSizeInSamples == 0)
-    {
-        RuntimeError("Epoch size cannot be 0.");
-    }
-
-    auto streams = GetStreamDescriptions();
-    if (inputDescriptions.size() != m_requiredInputs.size()
-        || !std::equal(inputDescriptions.begin(), inputDescriptions.end(), m_requiredInputs.begin()))
-    {
-        m_requiredInputs = inputDescriptions;
-
-        // Reallocating memory providers.
-        m_memoryProviders.resize(streams.size());
-        for (size_t i = 0; i < streams.size(); ++i)
-        {
-            int deviceId = m_requiredInputs[streams[i]->m_name];
-            if (deviceId < 0)
-                m_memoryProviders[i] = std::make_shared<HeapMemoryProvider>();
-            else
-                m_memoryProviders[i] = std::make_shared<CudaMemoryProvider>(deviceId);
-        }
-    }
-
-    m_randomizer->StartEpoch(config);
-    m_packer->StartEpoch(config, m_memoryProviders);
-}
-
-Minibatch CNTKTextFormatReader::ReadMinibatch()
-{
-    assert(m_packer != nullptr);
-    return m_packer->ReadMinibatch();
-}
 } } }
