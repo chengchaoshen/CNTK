@@ -15,6 +15,9 @@ std::vector<StreamDescriptionPtr> ReaderBase::GetStreamDescriptions()
     return m_deserializer->GetStreamDescriptions();
 }
 
+ReaderBase::~ReaderBase()
+{}
+
 void ReaderBase::StartEpoch(const EpochConfiguration& config, const std::map<std::wstring, int>& inputDescriptions)
 {
     if (config.m_totalEpochSizeInSamples == 0)

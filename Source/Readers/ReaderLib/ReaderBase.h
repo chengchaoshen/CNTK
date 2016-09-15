@@ -27,7 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Reads a single minibatch.
         Minibatch ReadMinibatch() override;
 
-        virtual ~ReaderBase() = 0 {}
+        virtual ~ReaderBase() = 0;
 
     protected:
         // Deserializer.
